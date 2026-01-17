@@ -1,3 +1,5 @@
+"""Load raw text from disk"""
+
 import os
 
 def load_raw_text(path: str) -> list[str]:
