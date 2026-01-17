@@ -35,9 +35,12 @@ def is_digit_only(line: str) -> bool:
     return bool(DIGIT_LINE_RE.match(line.strip()))
 
 def is_footer(line: str) -> bool:
-    """Return True if line matches known footer patterns"""
-    s = line.strip()
-    return bool(FOOTER_BAR_RE.search(s), FOOTER_VACHAN_RE.search(s))
+    '''Return True if line matches any known footer pattern.'''
+    s = normalize_diacritics(line.strip())
+    return bool(
+        FOOTER_BAR_RE.search(s)
+        or FOOTER_VACHAN_RE.search(s)
+    )
 
 def is_section_label(line: str) -> bool:
     """Return True if line is section label"""
