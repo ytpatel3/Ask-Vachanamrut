@@ -120,7 +120,7 @@ def finalize_sections(sections: list[dict]) -> list[dict]:
 
         output.append({
             'id': section_id,
-            'section': sec['header'],
+            'header': sec['header'],
             'title': sec['title'],
             'text': text,
             'start_line': sec['start_line'],
