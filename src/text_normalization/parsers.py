@@ -115,6 +115,10 @@ def finalize_sections(sections: list[dict]) -> list[dict]:
 
     for sec in sections:
         text = collapse_lines(sec['lines'])
+        if sec['title']:
+            first_paragraph, sep, remainder = text.partition('\n\n')
+            if normalize_diacritics(first_paragraph) == normalize_diacritics(sec['title']):
+                text = remainder if sep else ''
         header_clean = sec['header'].replace('–', '-')
         section_id = re.sub(r'[^A-Za-z0-9]+', '_', header_clean).strip('_')
 
