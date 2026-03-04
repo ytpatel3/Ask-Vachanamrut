@@ -15,6 +15,7 @@ from .cleaners import (
 )
 
 SECTION_NAMES = ['gadhada-i', 'gadhada-ii', 'gadhada-iii', 'sarangpur', 'kariyani', 'loya', 'panchala', 'vartal', 'amdavad', 'jetalpur', 'ashlali']
+STANDALONE_HEADERS = {'ashlali', 'bhugol-khagol'}
 HEADER_RE = re.compile(
     r'^('
     r'Gadhada\s+I|Gadhada\s+II|Gadhada\s+III|'
@@ -29,17 +30,22 @@ NO_TITLE_AMDAVAD_NUMBERS = {4, 5, 6, 7, 8}
 def is_section_header(line: str) -> bool:
     """Return true if line is a valid header"""
     s = normalize_diacritics(line.strip())
-    return bool(HEADER_RE.match(s))
+    return bool(HEADER_RE.match(s)) or s.lower() in STANDALONE_HEADERS
 
 def parse_header(header: str) -> tuple[str, int]:
     """Parse header into (section_name, section_number)."""
     m = HEADER_RE.match(header)
+    if not m:
+        raise ValueError(f'Unsupported numbered header: {header}')
     section = m.group(1).lower().replace(' ', '')
     number = int(m.group(2))
     return section, number
 
 def should_use_header_as_title(header: str) -> bool:
     """Return True if the header itself should be used as the title. (Ashlali, Jetalpur, Amdavad 4-8)"""
+    if normalize_diacritics(header).lower() in STANDALONE_HEADERS:
+        return True
+
     section, number = parse_header(header)
 
     if section in NO_TITLE_SECTIONS:
