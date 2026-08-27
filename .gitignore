@@ -8,6 +8,10 @@
 # RAG artifacts
 data/chroma/
 
+# Local-only project notes (not meant to be public)
+CLAUDE.md
+PROJECT_PLAN.md
+
 # Source for the following rules: https://raw.githubusercontent.com/github/gitignore/master/Python.gitignore
 # Byte-compiled / optimized / DLL files
 __pycache__/
