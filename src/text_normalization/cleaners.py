@@ -46,6 +46,8 @@ def is_section_label(line: str) -> bool:
     """Return True if line is section label"""
     return bool(SECTION_WORD_RE.match(normalize_diacritics(line.strip())))
 
+_LEGIT_NON_ASCII = set(DIACRITIC_MAP.keys()) | {'…'}
+
 def is_garbled(line: str) -> bool:
     """Return True if line appears corrupted/garbled"""
     s = line.strip()
@@ -55,7 +57,19 @@ def is_garbled(line: str) -> bool:
     letters = sum(ch.isalpha() for ch in s)
     non_ascii = sum(ord(ch) > 127 for ch in s)
 
-    return (letters / total < 0.25) and (non_ascii / total > 0.25)
+    if (letters / total < 0.25) and (non_ascii / total > 0.25):
+        return True
+
+    # Font-substitution garbling (Devanagari glyphs mapped onto Latin/PUA
+    # codepoints by the source PDF's custom font) still reads as mostly
+    # "letters" to str.isalpha(), so the ratio check above misses it. Catch
+    # it via characters outside the transliteration diacritics this corpus
+    # actually uses, or any Private Use Area codepoint (never legitimate).
+    if any(0xE000 <= ord(ch) <= 0xF8FF for ch in s):
+        return True
+
+    unexpected_non_ascii = sum(1 for ch in s if ord(ch) > 127 and ch not in _LEGIT_NON_ASCII)
+    return unexpected_non_ascii / total > 0.15
 
 def collapse_lines(lines: list[str]) -> str:
     """Merge line-wrapped text into paragraphs and preserve paragraph breaks"""
