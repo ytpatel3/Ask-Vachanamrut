@@ -96,28 +96,58 @@ def _build_units(text: str, *, max_tokens: int) -> list[dict]:
     return units
 
 
-def _select_overlap(prev_primary: list[int], units: list[dict], min_overlap: int) -> list[int]:
-    '''Pick the tail of `prev_primary` whose token total is >= min_overlap.'''
-    selected: list[int] = []
+def _select_overlap_text(
+    prev_primary: list[int],
+    units: list[dict],
+    min_overlap: int,
+    max_overlap: int,
+) -> str:
+    '''Build an overlap prefix from the tail of `prev_primary`.
+
+    Whole-unit overlap is preferred; if the trailing unit alone exceeds `max_overlap`,
+    fall back to taking its trailing sentences.
+    '''
+    parts: list[str] = []
     tokens = 0
     for j in reversed(prev_primary):
         if tokens >= min_overlap:
             break
-        selected.insert(0, j)
-        tokens += units[j]['tokens']
-    return selected
+        u_text = units[j]['text']
+        u_tok = units[j]['tokens']
+        if tokens + u_tok <= max_overlap:
+            parts.insert(0, u_text)
+            tokens += u_tok
+            continue
+        # Trailing unit is too big to include whole. Take its tail sentences,
+        # but only sentences that fit under max_overlap. If none fit, skip overlap.
+        sentences = split_sentences(u_text)
+        tail: list[str] = []
+        tail_tok = 0
+        for s in reversed(sentences):
+            s_tok = count_tokens(s)
+            if tokens + tail_tok + s_tok > max_overlap:
+                break
+            tail.insert(0, s)
+            tail_tok += s_tok
+            if tokens + tail_tok >= min_overlap:
+                break
+        if tail:
+            parts.insert(0, ' '.join(tail))
+            tokens += tail_tok
+        break  # don't keep walking back past a huge unit
+    return '\n\n'.join(parts)
 
 
 def _make_chunk(
     *,
     parent: dict,
     chunk_index: int,
-    overlap_indices: list[int],
+    overlap_text: str,
     primary_indices: list[int],
     units: list[dict],
 ) -> dict:
-    all_indices = overlap_indices + primary_indices
-    text = '\n\n'.join(units[i]['text'] for i in all_indices)
+    primary_text = '\n\n'.join(units[i]['text'] for i in primary_indices)
+    text = f'{overlap_text}\n\n{primary_text}' if overlap_text else primary_text
     primary_units = [units[i] for i in primary_indices]
     return {
         'chunk_id': f"{parent['id']}__c{chunk_index:03d}",
@@ -138,6 +168,7 @@ def chunk_discourse(
     target: int = config.CHUNK_TARGET_TOKENS,
     max_tokens: int = config.CHUNK_MAX_TOKENS,
     overlap: int = config.CHUNK_OVERLAP_TOKENS,
+    overlap_max: int = config.CHUNK_OVERLAP_MAX_TOKENS,
     min_tokens: int = config.CHUNK_MIN_TOKENS,
 ) -> list[dict]:
     '''Split one discourse into child chunks. Deterministic.'''
@@ -150,7 +181,7 @@ def chunk_discourse(
         return [_make_chunk(
             parent=discourse,
             chunk_index=0,
-            overlap_indices=[],
+            overlap_text='',
             primary_indices=list(range(len(units))),
             units=units,
         )]
@@ -161,6 +192,21 @@ def chunk_discourse(
     chunk_idx = 0
     last_primary: list[int] = []
 
+    def flush():
+        nonlocal chunk_idx, last_primary, primary, primary_tokens
+        ov_text = _select_overlap_text(last_primary, units, overlap, overlap_max) if last_primary else ''
+        chunks.append(_make_chunk(
+            parent=discourse,
+            chunk_index=chunk_idx,
+            overlap_text=ov_text,
+            primary_indices=primary,
+            units=units,
+        ))
+        chunk_idx += 1
+        last_primary = primary
+        primary = []
+        primary_tokens = 0
+
     i = 0
     while i < len(units):
         u = units[i]
@@ -170,29 +216,11 @@ def chunk_discourse(
             primary_tokens += u['tokens']
             i += 1
         else:
-            overlap_idx = _select_overlap(last_primary, units, overlap) if last_primary else []
-            chunks.append(_make_chunk(
-                parent=discourse,
-                chunk_index=chunk_idx,
-                overlap_indices=overlap_idx,
-                primary_indices=primary,
-                units=units,
-            ))
-            chunk_idx += 1
-            last_primary = primary
-            primary = []
-            primary_tokens = 0
+            flush()
             # Re-process unit `i` against the fresh chunk on next iteration.
 
     if primary:
-        overlap_idx = _select_overlap(last_primary, units, overlap) if last_primary else []
-        chunks.append(_make_chunk(
-            parent=discourse,
-            chunk_index=chunk_idx,
-            overlap_indices=overlap_idx,
-            primary_indices=primary,
-            units=units,
-        ))
+        flush()
 
     return chunks
 

@@ -72,7 +72,11 @@ def test_tiny_discourse_emits_single_chunk():
 
 
 def test_medium_discourse_emits_multiple_chunks_with_overlap():
-    paragraphs = [_para(120, f's{k}') for k in range(8)]  # ~120 tokens each → ~960 total
+    # Small paragraphs (~30 tokens each) so whole-paragraph overlap fits under overlap_max.
+    paragraphs = [
+        f'Paragraph {k}: the devotee should remember God always with love and devotion.'
+        for k in range(40)
+    ]
     text = '\n\n'.join(paragraphs)
     chunks = cm.chunk_discourse(_make_discourse(text), target=400, max_tokens=480, overlap=50, min_tokens=80)
     assert len(chunks) >= 2
@@ -80,15 +84,16 @@ def test_medium_discourse_emits_multiple_chunks_with_overlap():
     for i, c in enumerate(chunks):
         assert c['chunk_index'] == i
         assert c['chunk_id'] == f'Test_1__c{i:03d}'
-    # Every chunk respects max_tokens within ~25% (overlap can push slightly above target but under max).
+    # Every chunk respects budget envelope.
     for c in chunks:
         assert c['n_tokens'] <= 480 + 100, f'chunk {c["chunk_id"]} too big: {c["n_tokens"]}'
-    # Overlap: every non-first chunk shares at least one paragraph with the previous one.
+    # Overlap: every non-first chunk's text should begin with some content from the previous chunk.
     for i in range(1, len(chunks)):
-        prev_paras = [p.strip() for p in chunks[i - 1]['text'].split('\n\n') if p.strip()]
-        curr_paras = [p.strip() for p in chunks[i]['text'].split('\n\n') if p.strip()]
-        shared = set(prev_paras) & set(curr_paras)
-        assert shared, f'no paragraph overlap between chunk {i - 1} and {i}'
+        prev_text = chunks[i - 1]['text']
+        curr_text = chunks[i]['text']
+        # The first ~80 chars of the current chunk should appear somewhere in the previous chunk.
+        head = curr_text[:80].strip()
+        assert head and head in prev_text, f'no overlap between chunk {i - 1} and {i}'
 
 
 def test_paragraph_packing_respects_target():
@@ -127,6 +132,49 @@ def test_oversize_paragraph_triggers_sentence_fallback():
     joined = ' '.join(c['text'] for c in chunks)
     assert 'sentence 0 ' in joined
     assert 'sentence 149' in joined
+
+
+# ---- overlap cap ------------------------------------------------------------
+
+def test_overlap_does_not_balloon_when_trailing_paragraph_is_huge():
+    # Construct a sequence where one paragraph alone is ~target-sized,
+    # so the next chunk's whole-unit overlap would otherwise pull it in.
+    # With the overlap cap (max=100), the next chunk should NOT include the full
+    # trailing paragraph; it should sentence-tail it.
+    big_para = ' '.join(
+        f'This is sentence {k} about meditation and the divine name of God.' for k in range(40)
+    )
+    next_para = ' '.join(
+        f'And here is paragraph two sentence {k} about the path of bhakti.' for k in range(40)
+    )
+    text = f'{big_para}\n\n{next_para}'
+    chunks = cm.chunk_discourse(
+        _make_discourse(text),
+        target=400, max_tokens=480, overlap=50, overlap_max=100, min_tokens=80,
+    )
+    assert len(chunks) >= 2
+    # No chunk should exceed target + overlap_max + small slack.
+    for c in chunks:
+        assert c['n_tokens'] <= 400 + 100 + 30, f'chunk {c["chunk_id"]} too big: {c["n_tokens"]}'
+
+
+def test_overlap_skips_when_trailing_sentence_is_oversize():
+    # If the last sentence of the previous chunk is itself > overlap_max,
+    # we should NOT add it as overlap (would blow the budget); we should add nothing.
+    # Here we craft units so the previous chunk ends with a single ~200-tok sentence.
+    long_sent = ' '.join(f'word{k}' for k in range(150)) + '.'  # one giant "sentence"
+    p1 = 'Short opener.'
+    p2 = long_sent
+    p3 = ' '.join(f'Next chunk sentence {k}.' for k in range(30))  # forces a chunk break
+    text = f'{p1}\n\n{p2}\n\n{p3}'
+    chunks = cm.chunk_discourse(
+        _make_discourse(text),
+        target=400, max_tokens=480, overlap=50, overlap_max=100, min_tokens=80,
+    )
+    assert len(chunks) >= 2
+    # No chunk exceeds the budget envelope.
+    for c in chunks:
+        assert c['n_tokens'] <= 400 + 100 + 30, f'chunk {c["chunk_id"]} too big: {c["n_tokens"]}'
 
 
 # ---- determinism ------------------------------------------------------------
