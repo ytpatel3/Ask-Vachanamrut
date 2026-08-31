@@ -130,6 +130,37 @@ def test_call_claude_sends_system_prompt_and_user_message():
     assert kwargs['messages'] == [{'role': 'user', 'content': 'my user message'}]
 
 
+def test_call_claude_omits_temperature_for_models_that_reject_it():
+    '''claude-sonnet-5 (and other models in config.MODELS_WITHOUT_TEMPERATURE)
+    reject sampling params with a 400 -- temperature must not be sent.
+    '''
+    fake_response = MagicMock(content=[MagicMock(type='text', text='ok')])
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = fake_response
+    fake_anthropic_module = MagicMock()
+    fake_anthropic_module.Anthropic.return_value = fake_client
+
+    with patch.dict(sys.modules, {'anthropic': fake_anthropic_module}):
+        gen._call_claude('msg', model='claude-sonnet-5', temperature=0.2, max_tokens=100)
+
+    _, kwargs = fake_client.messages.create.call_args
+    assert 'temperature' not in kwargs
+
+
+def test_call_claude_includes_temperature_for_models_that_support_it():
+    fake_response = MagicMock(content=[MagicMock(type='text', text='ok')])
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = fake_response
+    fake_anthropic_module = MagicMock()
+    fake_anthropic_module.Anthropic.return_value = fake_client
+
+    with patch.dict(sys.modules, {'anthropic': fake_anthropic_module}):
+        gen._call_claude('msg', model='claude-sonnet-4-6', temperature=0.2, max_tokens=100)
+
+    _, kwargs = fake_client.messages.create.call_args
+    assert kwargs['temperature'] == 0.2
+
+
 # ---- live integration (marked; runs only when explicitly opted in) --------
 
 @pytest.mark.live

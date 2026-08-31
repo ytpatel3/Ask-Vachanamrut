@@ -54,16 +54,23 @@ def _extract_cited_ids(answer: str, sources: list[dict]) -> list[str]:
 def _call_claude(user_message: str, *, model: str, temperature: float, max_tokens: int) -> str:
     '''Call the Anthropic Messages API and return the response text. Lazy import
     keeps this module importable without the `anthropic` package installed.
+
+    `temperature` is omitted for models in `config.MODELS_WITHOUT_TEMPERATURE`,
+    which reject sampling params with a 400 rather than ignoring them.
     '''
     import anthropic
 
     client = anthropic.Anthropic()
+    kwargs = {}
+    if model not in config.MODELS_WITHOUT_TEMPERATURE:
+        kwargs['temperature'] = temperature
+
     response = client.messages.create(
         model=model,
         max_tokens=max_tokens,
-        temperature=temperature,
         system=SYSTEM_PROMPT,
         messages=[{'role': 'user', 'content': user_message}],
+        **kwargs,
     )
     return ''.join(block.text for block in response.content if block.type == 'text')
 
