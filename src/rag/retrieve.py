@@ -8,7 +8,6 @@ candidate pool than we return. Retrieval queries Chroma directly for `k` results
 
 from __future__ import annotations
 
-import functools
 import json
 from pathlib import Path
 
@@ -17,13 +16,8 @@ from src.rag.chunk import count_tokens
 from src.rag.embed import embed_query, get_collection, load_model
 
 
-@functools.lru_cache(maxsize=None)
 def _load_chunks_index(chunks_path: Path) -> dict[str, dict[int, dict]]:
-    '''Group chunk records by parent_id, then by chunk_index, for neighbor lookup.
-
-    Result is cached keyed on *chunks_path* so the JSONL file is parsed at most
-    once per distinct path for the lifetime of the process.
-    '''
+    '''Group chunk records by parent_id, then by chunk_index, for neighbor lookup.'''
     index: dict[str, dict[int, dict]] = {}
     with chunks_path.open('r', encoding='utf-8') as f:
         for line in f:
@@ -35,13 +29,8 @@ def _load_chunks_index(chunks_path: Path) -> dict[str, dict[int, dict]]:
     return index
 
 
-@functools.lru_cache(maxsize=None)
 def _load_discourse_lookup(discourses_path: Path) -> dict[str, str]:
-    '''Map parent_id -> full discourse text, for expanding chunks back into their source.
-
-    Result is cached keyed on *discourses_path* so the JSONL file is parsed at
-    most once per distinct path for the lifetime of the process.
-    '''
+    '''Map parent_id -> full discourse text, for expanding chunks back into their source.'''
     lookup: dict[str, str] = {}
     with discourses_path.open('r', encoding='utf-8') as f:
         for line in f:
