@@ -13,7 +13,15 @@ COLLECTION_NAME = 'vachanamrut_chunks_v1'
 
 EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-large-en-v1.5')
 RERANKER_MODEL = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-large')
-RAG_MODEL = os.getenv('RAG_MODEL', 'claude-sonnet-4-6')
+RAG_MODEL = os.getenv('RAG_MODEL', 'claude-sonnet-5')
+
+# Sampling params (temperature/top_p/top_k) are rejected with a 400 on these
+# models -- omit them entirely rather than passing GENERATION_TEMPERATURE.
+MODELS_WITHOUT_TEMPERATURE = frozenset({
+    'claude-fable-5', 'claude-mythos-5',
+    'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7',
+    'claude-sonnet-5',
+})
 
 # BGE asymmetric: queries get this prefix, passages do not.
 BGE_QUERY_INSTRUCTION = 'Represent this sentence for searching relevant passages: '
@@ -31,3 +39,6 @@ MAX_EXPANDED_TOKENS = 1500
 
 EMBED_BATCH_SIZE = 32
 RERANK_BATCH_SIZE = 16
+
+GENERATION_TEMPERATURE = 0.2
+GENERATION_MAX_TOKENS = 1024
