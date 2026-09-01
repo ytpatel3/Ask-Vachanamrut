@@ -1,3 +1,8 @@
+# Only needed to re-run the one-time PDF-to-text extraction step
+# (src/pdf_ingestion/extract_pdf.py). Kept separate from the root
+# requirements.txt so the main app/pipeline doesn't need pdfplumber and
+# friends -- most contributors will never touch this step. Install with
+# `pip install -r src/pdf_ingestion/requirements.txt` if you do.
 pytest
 pdfplumber==0.7.5
 regex

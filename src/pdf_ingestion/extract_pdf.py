@@ -18,7 +18,7 @@ from typing import List
 from tqdm import tqdm
 import pdfplumber
 
-DEFAULT_INPUT = 'data/Vachanamrut.pdf'
+DEFAULT_INPUT = 'data/raw/Vachanamrut.pdf'
 OUT_DIR = 'data/raw'
 OUT_FILE = 'extracted_raw.txt'
 PAGE_START = 33

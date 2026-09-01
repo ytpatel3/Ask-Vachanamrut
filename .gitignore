@@ -1,17 +1,22 @@
 # Editors
 .vscode/
 .idea/
+.claude/
 
 # Mac/OSX
 .DS_Store
 
 # RAG artifacts
-data/chroma/
+# data/chroma/ (the prebuilt vector index) is intentionally tracked, not
+# ignored -- Streamlit Community Cloud's free tier can't afford to rebuild
+# it live (1.3GB embedding model download + embedding 1243 chunks on a
+# constrained container). Re-commit it whenever you rebuild locally.
 data/usage/
 
 # Local-only project notes (not meant to be public)
 CLAUDE.md
 PROJECT_PLAN.md
+ARCHITECTURE.md
 
 # Source for the following rules: https://raw.githubusercontent.com/github/gitignore/master/Python.gitignore
 # Byte-compiled / optimized / DLL files
