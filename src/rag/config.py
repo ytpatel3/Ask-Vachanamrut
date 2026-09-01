@@ -17,9 +17,12 @@ EVAL_QA_PATH = DATA_DIR / 'eval' / 'qa_set.jsonl'
 
 EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-large-en-v1.5')
 RERANKER_MODEL = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-large')
-# Gemini free tier: request-capped (500/day), not token-capped, so it's the
-# closest to "unlimited" among free options -- see PROJECT_PLAN.md.
-RAG_MODEL = os.getenv('RAG_MODEL', 'gemini-2.5-flash')
+# Full "Flash" tier models (gemini-3.5/3.6/3.7-flash) are free-tier capped at
+# just 20 requests/day -- unusable for real traffic. Flash-Lite is capped at
+# 500/day instead (no daily token ceiling), and it also beats the other
+# genuinely-free-forever alternatives (e.g. Groq's gpt-oss-120b) on benchmarks
+# -- see PROJECT_PLAN.md for the full comparison.
+RAG_MODEL = os.getenv('RAG_MODEL', 'gemini-3.5-flash-lite')
 
 # BGE asymmetric: queries get this prefix, passages do not.
 BGE_QUERY_INSTRUCTION = 'Represent this sentence for searching relevant passages: '

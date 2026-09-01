@@ -87,12 +87,12 @@ def test_generate_calls_gemini_and_extracts_citations():
     sources = [_make_source('A__c000', 'devotion is central')]
 
     with patch.object(gen, '_call_gemini', return_value='Per [A__c000], devotion is key.') as mock_call:
-        result = gen.generate('What matters most?', sources, model='gemini-2.5-flash')
+        result = gen.generate('What matters most?', sources, model='gemini-3.5-flash-lite')
 
     mock_call.assert_called_once()
     args, kwargs = mock_call.call_args
     assert 'What matters most?' in args[0]
-    assert kwargs['model'] == 'gemini-2.5-flash'
+    assert kwargs['model'] == 'gemini-3.5-flash-lite'
     assert result['answer'] == 'Per [A__c000], devotion is key.'
     assert result['cited'] == ['A__c000']
 
@@ -134,12 +134,12 @@ def test_call_gemini_sends_system_instruction_and_contents():
 
     with patch.dict(sys.modules, _patch_genai_sdk(fake_client)):
         result = gen._call_gemini(
-            'my user message', model='gemini-2.5-flash', temperature=0.2, max_tokens=100,
+            'my user message', model='gemini-3.5-flash-lite', temperature=0.2, max_tokens=100,
         )
 
     assert result == 'an answer'
     _, generate_kwargs = fake_client.models.generate_content.call_args
-    assert generate_kwargs['model'] == 'gemini-2.5-flash'
+    assert generate_kwargs['model'] == 'gemini-3.5-flash-lite'
     assert generate_kwargs['contents'] == 'my user message'
     assert 'config' in generate_kwargs
 
@@ -151,7 +151,7 @@ def test_call_gemini_passes_temperature_and_max_output_tokens_to_config():
     fake_types_module = patch_dict['google.genai.types']
 
     with patch.dict(sys.modules, patch_dict):
-        gen._call_gemini('msg', model='gemini-2.5-flash', temperature=0.2, max_tokens=100)
+        gen._call_gemini('msg', model='gemini-3.5-flash-lite', temperature=0.2, max_tokens=100)
 
     _, config_kwargs = fake_types_module.GenerateContentConfig.call_args
     assert config_kwargs['system_instruction'] == gen.SYSTEM_PROMPT
