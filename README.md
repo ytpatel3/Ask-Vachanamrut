@@ -6,20 +6,16 @@ The Vachanamrut is the foundational scripture of the Swaminarayan tradition:
 devotion, the self, and the nature of God.
 
 **Ask Vachanamrut** is a retrieval-augmented generation (RAG) system that
-answers questions about the Vachanamrut grounded in its actual text --
-every answer cites the specific discourse(s) it's drawn from, so you can
+answers spiritual/philosophical questions grounded in the Vachanamrut.
+Every answer cites the specific discourse(s) it's drawn from, so you can
 verify it and read further.
 
-**Try it live:** [ask-vachanamrut.streamlit.app](https://ask-vachanamrut.streamlit.app) <!-- TODO: replace with your deployed URL -->
+**Try it live:** [ask-vachanamrut.streamlit.app](https://ask-vachanamrut.streamlit.app)
 
 ## How it works, briefly
 
-Retrieval and generation are separate, inspectable steps -- this isn't a
-single black-box model call:
-
 1. Your question is embedded and matched against a vector index of ~1,200
-   passages chunked from all 273 discourses (plus the Bhugol-Khagol
-   appendix).
+   passages chunked from all 273 discourses.
 2. The best-matching passages are expanded with surrounding context and
    handed to an LLM, instructed to answer *only* from what's given and to
    cite every passage it relies on.
