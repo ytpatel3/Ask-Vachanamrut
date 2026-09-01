@@ -24,6 +24,16 @@ RERANKER_MODEL = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-large')
 # -- see PROJECT_PLAN.md for the full comparison.
 RAG_MODEL = os.getenv('RAG_MODEL', 'gemini-3.5-flash-lite')
 
+# Models selectable in the UI, and their free-tier requests/day, read off the
+# account's real AI Studio dashboard (see PROJECT_PLAN.md for the full
+# research trail) -- used only for the sidebar's "requests left today"
+# estimate, not an authoritative count from Google. gemini-3.6-flash was
+# dropped after it started returning 503 UNAVAILABLE ("high demand") in
+# addition to its already-limiting 20 requests/day free tier.
+AVAILABLE_MODELS = ['gemini-3.5-flash-lite']
+MODEL_DAILY_LIMITS = {'gemini-3.5-flash-lite': 500}
+USAGE_LOG_PATH = DATA_DIR / 'usage' / 'request_log.json'
+
 # BGE asymmetric: queries get this prefix, passages do not.
 BGE_QUERY_INSTRUCTION = 'Represent this sentence for searching relevant passages: '
 
@@ -37,6 +47,11 @@ K_INITIAL = 30
 K_FINAL = 5
 EXPAND_NEIGHBORS = 1
 MAX_EXPANDED_TOKENS = 1500
+
+# Retrieval can pull more (K_FINAL) than this for generation grounding, but
+# the UI's "show retrieved passages" panel only displays the top few so it
+# doesn't overwhelm the reader.
+MAX_DISPLAYED_PASSAGES = 3
 
 EMBED_BATCH_SIZE = 32
 RERANK_BATCH_SIZE = 16
