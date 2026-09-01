@@ -155,8 +155,8 @@ def test_evaluate_skips_generation_when_use_generation_false():
 def test_live_evaluate_against_real_qa_set():
     if not config_eval_qa_exists():
         pytest.skip('data/eval/qa_set.jsonl does not exist yet')
-    if not os.getenv('ANTHROPIC_API_KEY'):
-        pytest.skip('ANTHROPIC_API_KEY not set')
+    if not os.getenv('GEMINI_API_KEY'):
+        pytest.skip('GEMINI_API_KEY not set')
 
     from src.rag import config
     qa_set = ev.load_qa_set(config.EVAL_QA_PATH)

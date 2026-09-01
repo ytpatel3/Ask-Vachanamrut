@@ -17,15 +17,9 @@ EVAL_QA_PATH = DATA_DIR / 'eval' / 'qa_set.jsonl'
 
 EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-large-en-v1.5')
 RERANKER_MODEL = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-large')
-RAG_MODEL = os.getenv('RAG_MODEL', 'claude-sonnet-5')
-
-# Sampling params (temperature/top_p/top_k) are rejected with a 400 on these
-# models -- omit them entirely rather than passing GENERATION_TEMPERATURE.
-MODELS_WITHOUT_TEMPERATURE = frozenset({
-    'claude-fable-5', 'claude-mythos-5',
-    'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7',
-    'claude-sonnet-5',
-})
+# Gemini free tier: request-capped (500/day), not token-capped, so it's the
+# closest to "unlimited" among free options -- see PROJECT_PLAN.md.
+RAG_MODEL = os.getenv('RAG_MODEL', 'gemini-2.5-flash')
 
 # BGE asymmetric: queries get this prefix, passages do not.
 BGE_QUERY_INSTRUCTION = 'Represent this sentence for searching relevant passages: '

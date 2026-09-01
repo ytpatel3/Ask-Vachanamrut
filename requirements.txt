@@ -1,7 +1,7 @@
 chromadb==0.5.20
 sentence-transformers==3.3.1
 tiktoken==0.8.0
-anthropic==0.40.0
+google-genai==2.21.0
 python-dotenv==1.0.1
 
 numpy>=1.26,<3

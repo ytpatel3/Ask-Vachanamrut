@@ -83,23 +83,23 @@ def test_generate_returns_fallback_when_no_sources():
     assert 'answer' in result
 
 
-def test_generate_calls_claude_and_extracts_citations():
+def test_generate_calls_gemini_and_extracts_citations():
     sources = [_make_source('A__c000', 'devotion is central')]
 
-    with patch.object(gen, '_call_claude', return_value='Per [A__c000], devotion is key.') as mock_call:
-        result = gen.generate('What matters most?', sources, model='claude-sonnet-5')
+    with patch.object(gen, '_call_gemini', return_value='Per [A__c000], devotion is key.') as mock_call:
+        result = gen.generate('What matters most?', sources, model='gemini-2.5-flash')
 
     mock_call.assert_called_once()
     args, kwargs = mock_call.call_args
     assert 'What matters most?' in args[0]
-    assert kwargs['model'] == 'claude-sonnet-5'
+    assert kwargs['model'] == 'gemini-2.5-flash'
     assert result['answer'] == 'Per [A__c000], devotion is key.'
     assert result['cited'] == ['A__c000']
 
 
 def test_generate_passes_through_temperature_and_max_tokens():
     sources = [_make_source('A__c000', 'text')]
-    with patch.object(gen, '_call_claude', return_value='ok') as mock_call:
+    with patch.object(gen, '_call_gemini', return_value='ok') as mock_call:
         gen.generate('q', sources, temperature=0.5, max_tokens=42)
 
     _, kwargs = mock_call.call_args
@@ -107,67 +107,65 @@ def test_generate_passes_through_temperature_and_max_tokens():
     assert kwargs['max_tokens'] == 42
 
 
-# ---- _call_claude: verify Anthropic client wiring (mocked SDK) --------------
+# ---- _call_gemini: verify Gemini client wiring (mocked SDK) -----------------
 
-def test_call_claude_sends_system_prompt_and_user_message():
-    fake_text_block = MagicMock(type='text', text='an answer')
-    fake_response = MagicMock(content=[fake_text_block])
+def _patch_genai_sdk(fake_client: MagicMock) -> dict:
+    '''Build the sys.modules patch dict for `from google import genai` /
+    `from google.genai import types`, wired to `fake_client`.
+    '''
+    fake_genai_module = MagicMock()
+    fake_genai_module.Client.return_value = fake_client
+    fake_types_module = MagicMock()
+    fake_genai_module.types = fake_types_module
+
+    fake_google_module = MagicMock()
+    fake_google_module.genai = fake_genai_module
+
+    return {
+        'google': fake_google_module,
+        'google.genai': fake_genai_module,
+        'google.genai.types': fake_types_module,
+    }
+
+
+def test_call_gemini_sends_system_instruction_and_contents():
     fake_client = MagicMock()
-    fake_client.messages.create.return_value = fake_response
+    fake_client.models.generate_content.return_value = MagicMock(text='an answer')
 
-    fake_anthropic_module = MagicMock()
-    fake_anthropic_module.Anthropic.return_value = fake_client
-
-    with patch.dict(sys.modules, {'anthropic': fake_anthropic_module}):
-        result = gen._call_claude(
-            'my user message', model='claude-sonnet-5', temperature=0.2, max_tokens=100,
+    with patch.dict(sys.modules, _patch_genai_sdk(fake_client)):
+        result = gen._call_gemini(
+            'my user message', model='gemini-2.5-flash', temperature=0.2, max_tokens=100,
         )
 
     assert result == 'an answer'
-    _, kwargs = fake_client.messages.create.call_args
-    assert kwargs['model'] == 'claude-sonnet-5'
-    assert kwargs['system'] == gen.SYSTEM_PROMPT
-    assert kwargs['messages'] == [{'role': 'user', 'content': 'my user message'}]
+    _, generate_kwargs = fake_client.models.generate_content.call_args
+    assert generate_kwargs['model'] == 'gemini-2.5-flash'
+    assert generate_kwargs['contents'] == 'my user message'
+    assert 'config' in generate_kwargs
 
 
-def test_call_claude_omits_temperature_for_models_that_reject_it():
-    '''claude-sonnet-5 (and other models in config.MODELS_WITHOUT_TEMPERATURE)
-    reject sampling params with a 400 -- temperature must not be sent.
-    '''
-    fake_response = MagicMock(content=[MagicMock(type='text', text='ok')])
+def test_call_gemini_passes_temperature_and_max_output_tokens_to_config():
     fake_client = MagicMock()
-    fake_client.messages.create.return_value = fake_response
-    fake_anthropic_module = MagicMock()
-    fake_anthropic_module.Anthropic.return_value = fake_client
+    fake_client.models.generate_content.return_value = MagicMock(text='ok')
+    patch_dict = _patch_genai_sdk(fake_client)
+    fake_types_module = patch_dict['google.genai.types']
 
-    with patch.dict(sys.modules, {'anthropic': fake_anthropic_module}):
-        gen._call_claude('msg', model='claude-sonnet-5', temperature=0.2, max_tokens=100)
+    with patch.dict(sys.modules, patch_dict):
+        gen._call_gemini('msg', model='gemini-2.5-flash', temperature=0.2, max_tokens=100)
 
-    _, kwargs = fake_client.messages.create.call_args
-    assert 'temperature' not in kwargs
-
-
-def test_call_claude_includes_temperature_for_models_that_support_it():
-    fake_response = MagicMock(content=[MagicMock(type='text', text='ok')])
-    fake_client = MagicMock()
-    fake_client.messages.create.return_value = fake_response
-    fake_anthropic_module = MagicMock()
-    fake_anthropic_module.Anthropic.return_value = fake_client
-
-    with patch.dict(sys.modules, {'anthropic': fake_anthropic_module}):
-        gen._call_claude('msg', model='claude-sonnet-4-6', temperature=0.2, max_tokens=100)
-
-    _, kwargs = fake_client.messages.create.call_args
-    assert kwargs['temperature'] == 0.2
+    _, config_kwargs = fake_types_module.GenerateContentConfig.call_args
+    assert config_kwargs['system_instruction'] == gen.SYSTEM_PROMPT
+    assert config_kwargs['temperature'] == 0.2
+    assert config_kwargs['max_output_tokens'] == 100
 
 
 # ---- live integration (marked; runs only when explicitly opted in) --------
 
 @pytest.mark.live
 def test_live_generate_answers_from_real_index():
-    '''End-to-end: retrieve real chunks, then call the real Anthropic API.'''
-    if not os.getenv('ANTHROPIC_API_KEY'):
-        pytest.skip('ANTHROPIC_API_KEY not set')
+    '''End-to-end: retrieve real chunks, then call the real Gemini API.'''
+    if not os.getenv('GEMINI_API_KEY'):
+        pytest.skip('GEMINI_API_KEY not set')
 
     from src.rag.retrieve import retrieve
 

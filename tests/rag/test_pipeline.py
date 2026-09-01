@@ -69,8 +69,8 @@ def test_answer_returns_empty_sources_list_when_nothing_retrieved():
 
 @pytest.mark.live
 def test_live_answer_end_to_end():
-    if not os.getenv('ANTHROPIC_API_KEY'):
-        pytest.skip('ANTHROPIC_API_KEY not set')
+    if not os.getenv('GEMINI_API_KEY'):
+        pytest.skip('GEMINI_API_KEY not set')
 
     result = pl.answer('What is the nature of maya?')
     assert result['answer']

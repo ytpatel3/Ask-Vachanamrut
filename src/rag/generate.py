@@ -1,7 +1,7 @@
 '''Generation: turn retrieved chunks + a question into a grounded, cited answer.
 
-Calls the Anthropic API with `config.RAG_MODEL`. Requires `ANTHROPIC_API_KEY` in
-the environment (or a `.env` file, loaded via `python-dotenv`).
+Calls the Gemini API with `config.RAG_MODEL`. Requires `GEMINI_API_KEY` in the
+environment (or a `.env` file, loaded via `python-dotenv`).
 '''
 
 from __future__ import annotations
@@ -51,28 +51,28 @@ def _extract_cited_ids(answer: str, sources: list[dict]) -> list[str]:
     return cited
 
 
-def _call_claude(user_message: str, *, model: str, temperature: float, max_tokens: int) -> str:
-    '''Call the Anthropic Messages API and return the response text. Lazy import
-    keeps this module importable without the `anthropic` package installed.
+def _call_gemini(user_message: str, *, model: str, temperature: float, max_tokens: int) -> str:
+    '''Call the Gemini API and return the response text. Lazy import keeps this
+    module importable without the `google-genai` package installed.
 
-    `temperature` is omitted for models in `config.MODELS_WITHOUT_TEMPERATURE`,
-    which reject sampling params with a 400 rather than ignoring them.
+    Some Gemini models silently ignore temperature/top_p/top_k rather than
+    erroring (unlike Claude, which hard-rejects them on certain models) -- it's
+    safe to always pass it here.
     '''
-    import anthropic
+    from google import genai
+    from google.genai import types
 
-    client = anthropic.Anthropic()
-    kwargs = {}
-    if model not in config.MODELS_WITHOUT_TEMPERATURE:
-        kwargs['temperature'] = temperature
-
-    response = client.messages.create(
+    client = genai.Client()
+    response = client.models.generate_content(
         model=model,
-        max_tokens=max_tokens,
-        system=SYSTEM_PROMPT,
-        messages=[{'role': 'user', 'content': user_message}],
-        **kwargs,
+        contents=user_message,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+        ),
     )
-    return ''.join(block.text for block in response.content if block.type == 'text')
+    return response.text
 
 
 def generate(
@@ -94,7 +94,7 @@ def generate(
         }
 
     user_message = _build_user_message(query, sources)
-    answer = _call_claude(user_message, model=model, temperature=temperature, max_tokens=max_tokens)
+    answer = _call_gemini(user_message, model=model, temperature=temperature, max_tokens=max_tokens)
     cited = _extract_cited_ids(answer, sources)
 
     return {'answer': answer, 'cited': cited}
