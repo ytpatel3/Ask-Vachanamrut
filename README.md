@@ -26,9 +26,6 @@ single black-box model call:
 3. The app shows the answer with inline citations, plus the actual
    retrieved passages and a link to read the full discourse.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full breakdown of every file
-and how the pipeline works end to end.
-
 ## Using the app
 
 - Type a question in the box and hit **Ask** -- it doesn't need to be
@@ -54,8 +51,6 @@ scripts/                   CLI entrypoints (build the index, run eval, etc.)
 data/                      raw/clean text, the vector index, the eval set
 tests/                     mirrors src/, one test file per module
 ```
-
-Full explanation of what each file does and why: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Running it locally
 
