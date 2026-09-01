@@ -3,13 +3,17 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / '.env')
 DATA_DIR = PROJECT_ROOT / 'data'
 
 DISCOURSES_PATH = DATA_DIR / 'clean' / 'vachanamrut.jsonl'
 CHUNKS_PATH = DATA_DIR / 'clean' / 'vachanamrut_chunks.jsonl'
 CHROMA_DIR = DATA_DIR / 'chroma'
 COLLECTION_NAME = 'vachanamrut_chunks_v1'
+EVAL_QA_PATH = DATA_DIR / 'eval' / 'qa_set.jsonl'
 
 EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'BAAI/bge-large-en-v1.5')
 RERANKER_MODEL = os.getenv('RERANKER_MODEL', 'BAAI/bge-reranker-large')
