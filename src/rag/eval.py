@@ -11,6 +11,7 @@ belong to one of the expected parent discourses.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from src.rag import config
@@ -72,10 +73,12 @@ def evaluate(
     '''Run retrieval (and optionally generation) for every question in `qa_set`
     and report aggregate recall@k, MRR, and citation precision.
 
-    `use_generation=False` skips the Claude API call entirely for a fast,
+    `use_generation=False` skips the generation API call entirely for a fast,
     free retrieval-only pass (citation_precision is reported as None in that
     case) -- useful for iterating on chunking/embedding without spending on
-    generation every run.
+    generation every run. When generating, calls are paced by
+    `config.GENERATION_RATE_LIMIT_DELAY_SECONDS` to stay under the free
+    tier's per-minute cap.
     '''
     per_question = []
     for item in qa_set:
@@ -90,6 +93,7 @@ def evaluate(
         if use_generation:
             result = generate(item['question'], sources, model=model, temperature=temperature, max_tokens=max_tokens)
             cited_hit = citation_precision(result['cited'], sources, expected)
+            time.sleep(config.GENERATION_RATE_LIMIT_DELAY_SECONDS)
 
         per_question.append({
             'id': item['id'],

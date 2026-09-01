@@ -43,3 +43,7 @@ RERANK_BATCH_SIZE = 16
 
 GENERATION_TEMPERATURE = 0.2
 GENERATION_MAX_TOKENS = 1024
+
+# gemini-3.5-flash-lite's free tier caps at 15 requests/minute; pace batch
+# generation (e.g. eval.evaluate()) to stay under that. 60/15 = 4s, + slack.
+GENERATION_RATE_LIMIT_DELAY_SECONDS = 4.5

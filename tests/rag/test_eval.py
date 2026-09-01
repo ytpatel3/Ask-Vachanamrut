@@ -122,7 +122,8 @@ def test_evaluate_aggregates_recall_mrr_and_citation_precision():
         return {'answer': 'ans', 'cited': []}
 
     with patch.object(ev, 'retrieve', side_effect=fake_retrieve), \
-         patch.object(ev, 'generate', side_effect=fake_generate):
+         patch.object(ev, 'generate', side_effect=fake_generate), \
+         patch.object(ev.time, 'sleep'):
         report = ev.evaluate(qa_set)
 
     assert report['n'] == 2
@@ -147,6 +148,33 @@ def test_evaluate_skips_generation_when_use_generation_false():
     assert report['citation_precision'] is None
     assert report['per_question'][0]['citation_precision'] is None
     assert report['recall_at_k'] == 1.0
+
+
+def test_evaluate_paces_generation_calls_to_respect_rate_limit():
+    qa_set = [
+        {'id': 'eval_001', 'question': 'q1', 'expected_parent_ids': ['A']},
+        {'id': 'eval_002', 'question': 'q2', 'expected_parent_ids': ['A']},
+    ]
+    sources = [_make_source('A__c000', 'A')]
+
+    with patch.object(ev, 'retrieve', return_value=sources), \
+         patch.object(ev, 'generate', return_value={'answer': 'ans', 'cited': []}), \
+         patch.object(ev.time, 'sleep') as mock_sleep:
+        ev.evaluate(qa_set, use_generation=True)
+
+    assert mock_sleep.call_count == 2
+    mock_sleep.assert_called_with(ev.config.GENERATION_RATE_LIMIT_DELAY_SECONDS)
+
+
+def test_evaluate_does_not_sleep_when_use_generation_false():
+    qa_set = [{'id': 'eval_001', 'question': 'q1', 'expected_parent_ids': ['A']}]
+    sources = [_make_source('A__c000', 'A')]
+
+    with patch.object(ev, 'retrieve', return_value=sources), \
+         patch.object(ev.time, 'sleep') as mock_sleep:
+        ev.evaluate(qa_set, use_generation=False)
+
+    mock_sleep.assert_not_called()
 
 
 # ---- live integration (marked; runs only when explicitly opted in) --------
