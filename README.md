@@ -128,10 +128,3 @@ python src/pdf_ingestion/extract_pdf.py
 # Re-normalize raw text into structured discourse JSON:
 python -m scripts.normalize
 ```
-
-## Data source
-
-The scripture text used here is a specific English translation of the
-Vachanamrut. If you fork this project to publish your own deployment,
-verify you have the right to redistribute whichever translation you use --
-this repo does not grant that right on your behalf.
