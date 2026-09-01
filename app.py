@@ -71,10 +71,11 @@ if submitted and query.strip():
 
 result = st.session_state.result
 if result:
-    st.markdown(
-        f'<div class="answer-box">{format_answer_html(result["answer"], result["cited"])}</div>',
-        unsafe_allow_html=True,
-    )
+    with st.container(key='answer_box'):
+        st.markdown(
+            format_answer_html(result['answer'], result['cited'], result['sources']),
+            unsafe_allow_html=True,
+        )
 
     displayed_sources = result['sources'][:config.MAX_DISPLAYED_PASSAGES]
     with st.expander(f'Show retrieved passages ({len(displayed_sources)})'):

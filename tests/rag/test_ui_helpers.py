@@ -21,27 +21,32 @@ def _make_source(chunk_id: str, header: str = 'Gadhada I-1', title: str = 'A Tit
 
 # ---- format_answer_html -------------------------------------------------------
 
-def test_format_answer_html_wraps_cited_id_in_badge():
-    html = ui.format_answer_html('Per [A__c000], devotion is key.', ['A__c000'])
-    assert '<span class="citation-badge">[A__c000]</span>' in html
+def test_format_answer_html_wraps_cited_id_in_badge_labeled_with_header():
+    sources = [_make_source('A__c000', header='Gadhada I-1')]
+    html = ui.format_answer_html('Per [A__c000], devotion is key.', ['A__c000'], sources)
+    assert '<span class="citation-badge">[Gadhada I-1]</span>' in html
+    assert 'A__c000' not in html
 
 
 def test_format_answer_html_leaves_uncited_bracket_unwrapped():
-    html = ui.format_answer_html('See [A__c000] and [B__c001].', ['A__c000'])
-    assert '<span class="citation-badge">[A__c000]</span>' in html
-    assert '<span class="citation-badge">[B__c001]</span>' not in html
+    sources = [_make_source('A__c000', header='Gadhada I-1'), _make_source('B__c001', header='Gadhada I-2')]
+    html = ui.format_answer_html('See [A__c000] and [B__c001].', ['A__c000'], sources)
+    assert '<span class="citation-badge">[Gadhada I-1]</span>' in html
+    assert '<span class="citation-badge">[Gadhada I-2]</span>' not in html
     assert '[B__c001]' in html
 
 
 def test_format_answer_html_escapes_html_in_answer_text():
-    html = ui.format_answer_html('<script>alert(1)</script> [A__c000]', ['A__c000'])
+    sources = [_make_source('A__c000')]
+    html = ui.format_answer_html('<script>alert(1)</script> [A__c000]', ['A__c000'], sources)
     assert '<script>' not in html
     assert '&lt;script&gt;' in html
 
 
-def test_format_answer_html_converts_newlines_to_br():
-    html = ui.format_answer_html('line one\nline two', [])
-    assert '<br>' in html
+def test_format_answer_html_preserves_markdown_syntax_for_streamlit_to_render():
+    html = ui.format_answer_html('**bold** and\n\n* a bullet', [], [])
+    assert '**bold**' in html
+    assert '* a bullet' in html
 
 
 # ---- build_source_label --------------------------------------------------------
@@ -54,6 +59,11 @@ def test_build_source_label_includes_header_and_title():
 def test_build_source_label_omits_dash_when_title_empty():
     label = ui.build_source_label(_make_source('X__c000', title=''))
     assert label == 'Gadhada I-1'
+
+
+def test_build_source_label_omits_dash_when_title_duplicates_header():
+    label = ui.build_source_label(_make_source('X__c000', header='Amdavad-8', title='Amdavad-8'))
+    assert label == 'Amdavad-8'
 
 
 # ---- build_quote_preview -------------------------------------------------------
@@ -77,6 +87,49 @@ def test_build_quote_preview_falls_back_to_word_boundary_with_ellipsis():
 
 def test_build_quote_preview_strips_surrounding_whitespace():
     assert ui.build_quote_preview('  padded text  ') == 'padded text'
+
+
+def test_build_quote_preview_skips_boilerplate_opening_paragraph():
+    text = (
+        'On Kartik sudi 11, Samvat 1879 [25 November 1822], Shriji Maharaj was '
+        "sitting on the veranda. He was dressed entirely in white clothes.\n\n"
+        'Then Shriji Maharaj said, "Anger arises from egotism."'
+    )
+    assert ui.build_quote_preview(text) == 'Then Shriji Maharaj said, "Anger arises from egotism."'
+
+
+def test_build_quote_preview_skips_orphaned_title_fragment_and_boilerplate():
+    text = (
+        'of God\n\n'
+        'On Kartik sudi 11, Samvat 1879, Shriji Maharaj was sitting in the hall.\n\n'
+        'Then Shriji Maharaj said, "This is the real content."'
+    )
+    assert ui.build_quote_preview(text) == 'Then Shriji Maharaj said, "This is the real content."'
+
+
+def test_build_quote_preview_skips_clothing_description_paragraph():
+    '''A known corpus bug (mid-sentence footer leakage) sometimes splits the
+    narrator's physical-description sentence from the date line into its own
+    paragraph -- it should still be skipped even without "Samvat" in it.
+    '''
+    text = (
+        'Amdavad. He had tied a beautiful, white pãgh around His head and was '
+        'wearing a white khes. A garland of roses adorned His neck as well.\n\n'
+        'While serving ladus to the sadhus, Shriji Maharaj said, "A sadhu should renounce anger."'
+    )
+    assert ui.build_quote_preview(text) == (
+        'While serving ladus to the sadhus, Shriji Maharaj said, "A sadhu should renounce anger."'
+    )
+
+
+def test_build_quote_preview_does_not_skip_when_chunk_has_no_boilerplate():
+    text = 'Then Shriji Maharaj continued, "This chunk starts mid-discourse."'
+    assert ui.build_quote_preview(text) == text
+
+
+def test_build_quote_preview_never_skips_down_to_nothing():
+    text = 'On Kartik sudi 11, Samvat 1879, short.'
+    assert ui.build_quote_preview(text) == text
 
 
 # ---- load_anirdesh_vachno_map / anirdesh_url -----------------------------------

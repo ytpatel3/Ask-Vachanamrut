@@ -29,7 +29,7 @@ THEME_CSS = '''
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Geist:wght@300;400;500;600;700&display=swap');
 
 html, body, .stApp, .stApp * {
-    font-family: 'Geist', sans-serif;
+    font-family: 'Geist', sans-serif !important;
 }
 
 /* Streamlit renders expander/alert/spinner chevrons etc. as ligature text in
@@ -78,7 +78,7 @@ html, body, .stApp, .stApp * {
 }
 
 .app-title {
-    font-family: 'Orbitron', sans-serif;
+    font-family: 'Orbitron', sans-serif !important;
     font-size: 3.2rem;
     font-weight: 900;
     letter-spacing: 0.06em;
@@ -120,7 +120,16 @@ html, body, .stApp, .stApp * {
     100%  { opacity: 0; }
 }
 
-.answer-box {
+/* Styles the st.container(key='answer_box') wrapping the answer in app.py.
+   The answer used to be built as one big HTML string with a literal <div>
+   around it, passed to a single st.markdown() call -- but CommonMark stops
+   parsing markdown inside a raw HTML block, so **bold** and bullet markers
+   rendered as literal asterisks. Using a real st.container() with its
+   auto-generated st-key-* class lets the inner st.markdown() call contain
+   pure markdown (plus small inline <span> badges, which don't suppress
+   markdown parsing the way a block-level <div> does) while still getting
+   the glass-panel look. */
+.st-key-answer_box {
     background: rgba(8, 7, 18, 0.72);
     backdrop-filter: blur(6px);
     border: 1px solid rgba(167, 139, 250, 0.25);
@@ -349,37 +358,80 @@ ROTATING_EXAMPLES_HTML = '''
 ))
 
 
-def format_answer_html(answer: str, cited: list[str]) -> str:
-    '''Render `answer` as HTML with cited chunk-id brackets (e.g.
-    "[Gadhada I-1__c003]") wrapped in glowing citation badges. Escapes
-    everything else so the LLM output can't inject arbitrary HTML.
+def format_answer_html(answer: str, cited: list[str], sources: list[dict]) -> str:
+    '''Render `answer` for `st.markdown(..., unsafe_allow_html=True)`: cited
+    chunk-id brackets (e.g. "[Gadhada I-1__c003]") become glowing citation
+    badges labeled with the source's discourse reference (e.g.
+    "[Gadhada I-1]") rather than the internal chunk_id. Escapes everything
+    else so the LLM output can't inject arbitrary HTML.
+
+    Deliberately returns plain markdown (bold, bullet lists) with only small
+    inline HTML spans mixed in -- don't wrap the result in a block-level tag
+    like <div> in the same st.markdown call, since CommonMark stops parsing
+    markdown inside a raw HTML block, which is what caused **bold** and
+    bullet markers to render as literal asterisks.
     '''
+    header_by_chunk_id = {s['chunk_id']: s['header'] for s in sources}
     cited_set = set(cited)
     parts = _CITATION_SPLIT_RE.split(answer)
     out = []
     for part in parts:
-        if part.startswith('[') and part.endswith(']') and part[1:-1] in cited_set:
-            out.append(f'<span class="citation-badge">{html.escape(part)}</span>')
+        chunk_id = part[1:-1]
+        if part.startswith('[') and part.endswith(']') and chunk_id in cited_set:
+            label = header_by_chunk_id.get(chunk_id, chunk_id)
+            out.append(f'<span class="citation-badge">[{html.escape(label)}]</span>')
         else:
             out.append(html.escape(part))
-    return ''.join(out).replace('\n', '<br>')
+    return ''.join(out)
 
 
 def build_source_label(source: dict) -> str:
     '''Human-readable label for one retrieved source, e.g.
-    "Gadhada I-1 -- On the nature of maya".
+    "Gadhada I-1 -- On the nature of maya". Some discourses have no distinct
+    title in the source text, in which case `title` was parsed as a copy of
+    `header` -- skip the redundant repetition rather than showing e.g.
+    "Amdavad-8 -- Amdavad-8".
     '''
-    if source['title']:
+    if source['title'] and source['title'] != source['header']:
         return f"{source['header']} -- {source['title']}"
     return source['header']
 
 
-def build_quote_preview(text: str, max_chars: int = 500) -> str:
-    '''Trim a retrieved passage down to a short quote (a few sentences),
-    cutting at the last sentence boundary before `max_chars` where one
-    exists so the preview doesn't end mid-sentence.
+_BOILERPLATE_MARKERS = ('Samvat', 'dressed', 'pãgh', 'adorned His neck')
+
+
+def _is_boilerplate_opening(paragraph: str) -> bool:
+    '''True for a discourse's scene-setting opening: the date/location line
+    ("On Kartik sudi 11, Samvat 1879 [...], Shriji Maharaj was sitting in
+    Dada Khachar's darbar ... had gathered before Him.") or the narrator's
+    physical-description line that often follows it as a separate paragraph
+    ("He was dressed entirely in white clothes... A garland ... adorned His
+    neck."), which a known corpus bug (mid-sentence footer leakage --
+    see PROJECT_PLAN.md) sometimes splits from the date line even when it's
+    part of the same sentence. Also catches a leftover title fragment stuck
+    in its own short paragraph (extract_title() only captures one physical
+    line, so a title that wrapped across two lines in the source PDF leaves
+    its second line orphaned). None of this is the substantive content a
+    quote preview should start from.
     '''
-    text = text.strip()
+    if len(paragraph.split()) < 12:
+        return True
+    return any(marker in paragraph for marker in _BOILERPLATE_MARKERS)
+
+
+def build_quote_preview(text: str, max_chars: int = 500) -> str:
+    '''Trim a retrieved passage down to a short quote (a few sentences).
+
+    Skips leading boilerplate/title-fragment paragraphs (see
+    `_is_boilerplate_opening`) so the quote starts from actual content, then
+    cuts at the last sentence boundary before `max_chars` where one exists
+    so the preview doesn't end mid-sentence.
+    '''
+    paragraphs = text.strip().split('\n\n')
+    while len(paragraphs) > 1 and _is_boilerplate_opening(paragraphs[0]):
+        paragraphs.pop(0)
+    text = '\n\n'.join(paragraphs).strip()
+
     if len(text) <= max_chars:
         return text
 
